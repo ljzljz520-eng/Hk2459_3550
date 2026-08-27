@@ -85,11 +85,12 @@ func (s *Service) UpdateChannel(ctx context.Context, id string, enabled bool, li
 	if e = s.store.SaveAudit(a); e != nil {
 		return e
 	}
-	if enabled {
-		s.mu.Lock()
-		s.cache[id] = next
-		s.mu.Unlock()
-	}
+	// Always refresh the in-memory cache with the persisted state. The cache is
+	// read-through on every Pay request, so a stale entry here would let new
+	// payments be routed to a channel that was just switched off.
+	s.mu.Lock()
+	s.cache[id] = next
+	s.mu.Unlock()
 	return nil
 }
 func (s *Service) Preview(ctx context.Context, id string, enabled bool) (string, error) {
@@ -108,7 +109,7 @@ func (s *Service) Preview(ctx context.Context, id string, enabled bool) (string,
 func (s *Service) Pay(ctx context.Context, r model.PaymentRequest) (model.PaymentResult, error) {
 	c, e := s.load(ctx, r.ChannelID)
 	if e != nil {
-		return model.PaymentResult{}, e
+		return model.PaymentResult{ID: r.ID, ChannelID: r.ChannelID, Reason: ErrUnavailable.Error()}, ErrUnavailable
 	}
 	if !c.CanAccept(r.AmountCents) {
 		if !c.Enabled {

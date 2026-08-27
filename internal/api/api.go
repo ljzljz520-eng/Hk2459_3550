@@ -54,7 +54,12 @@ func (a *Server) pay(w http.ResponseWriter, r *http.Request) {
 	p.CreatedAt = now()
 	v, e := a.s.Pay(r.Context(), p)
 	if e != nil {
-		http.Error(w, e.Error(), 409)
+		// Surface the structured result so callers can read Accepted=false and
+		// the specific reason (e.g. channel unavailable). Pay always populates
+		// v with the rejected result on a known business error.
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(v)
 		return
 	}
 	json.NewEncoder(w).Encode(v)
