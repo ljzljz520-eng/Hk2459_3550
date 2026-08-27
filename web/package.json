@@ -1,0 +1,1 @@
+{"name":"payment-console-web","version":"1.0.0","scripts":{"build":"node -e \"console.log('built')\""}}
